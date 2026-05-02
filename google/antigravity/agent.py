@@ -15,6 +15,7 @@
 """Layer 1 API for Antigravity SDK."""
 
 import asyncio
+import json
 import logging
 from typing import Any, Callable
 
@@ -57,6 +58,8 @@ class AgentConfig(pydantic.BaseModel):
     triggers: Custom triggers to register.
     mcp_servers: MCP server configurations.
     workspaces: Directory paths to restrict the agent to.
+    response_schema: Optional Pydantic model or JSON schema dict for structured
+      output.
     model: Sugar — sets gemini_config.models.default.
     api_key: Sugar — sets gemini_config.api_key.
   """
@@ -78,10 +81,34 @@ class AgentConfig(pydantic.BaseModel):
   triggers: list[triggers_lib.Trigger] = pydantic.Field(default_factory=list)
   mcp_servers: list[dict[str, Any]] = pydantic.Field(default_factory=list)
   workspaces: list[str] = pydantic.Field(default_factory=list)
+  response_schema: dict[str, Any] | type[pydantic.BaseModel] | str | None = None
 
   # Top-level sugar — flows into gemini_config.
   model: str | None = None
   api_key: str | None = None
+
+  @pydantic.field_validator("response_schema")
+  def _validate_schema(cls, v):  # pylint: disable=no-self-argument
+    if v is None:
+      return None
+    if isinstance(v, str):
+      try:
+        json.loads(v)
+        return v
+      except json.JSONDecodeError:
+        logging.warning(
+            "Provided response_schema string is not a valid JSON. Schema"
+            " ignored."
+        )
+        return None
+    if isinstance(v, dict):
+      return json.dumps(v)
+    if isinstance(v, type) and issubclass(v, pydantic.BaseModel):
+      return json.dumps(v.model_json_schema())
+    logging.warning(
+        "Unsupported response_schema format: %s. Schema ignored.", type(v)
+    )
+    return None
 
   @pydantic.model_validator(mode="after")
   def _apply_sugar(self) -> "AgentConfig":
@@ -115,6 +142,8 @@ class Agent:
         config: Declarative agent configuration.
     """
     self._config = config
+    if config.response_schema:
+      self._config.capabilities.finish_tool_schema_json = config.response_schema
     self._strategy = None
     self._conversation = None
     self._conversation_cm = None
@@ -270,6 +299,7 @@ class Agent:
           "Agent session not started. Use 'async with Agent(...)'."
       )
 
+    assert self._hook_runner is not None
     self._hook_runner.on_interaction_hooks.append(cli.AskQuestionHook())
     print("Starting interactive loop. Type 'exit' or 'quit' to end.")
     while True:

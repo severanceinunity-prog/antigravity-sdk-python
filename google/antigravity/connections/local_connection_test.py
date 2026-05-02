@@ -637,6 +637,44 @@ class LocalConnectionStepFromDictTest(unittest.TestCase):
     })
     self.assertEqual(step.type, types.StepType.TOOL_CALL)
 
+  def test_structured_output_extracted_from_finish(self):
+    """Verifies that structured output is extracted when finish payload is present.
+
+    Why: The connection layer is responsible for extracting and parsing
+    the final structured output from the wire format so Layer 2 and E2E tests
+    can access it natively.
+    """
+    step = local_connection.LocalConnectionStep.from_dict({
+        "source": "SOURCE_MODEL",
+        "state": "STATE_DONE",
+        "finish": {
+            "output_string": (
+                '{"total_revenue": 386.0, "top_selling_product": "Widget A"}'
+            ),
+        },
+    })
+    self.assertEqual(
+        step.structured_output,
+        {"total_revenue": 386.0, "top_selling_product": "Widget A"},
+    )
+
+  def test_structured_output_extracted_from_finish_handles_invalid_json(self):
+    """Verifies that invalid JSON in finish payload defaults to None.
+
+    Why: The connection layer should handle malformed JSON payloads gracefully
+    by returning None instead of raising a fatal exception.
+    """
+    step = local_connection.LocalConnectionStep.from_dict({
+        "source": "SOURCE_MODEL",
+        "state": "STATE_DONE",
+        "finish": {
+            "output_string": (  # Invalid JSON
+                '{"total_revenue": 386.0, "top_selling_product": }'
+            ),
+        },
+    })
+    self.assertIsNone(step.structured_output)
+
 
 class LocalConnectionToolCallNoRunnerTest(unittest.IsolatedAsyncioTestCase):
   """Tests for tool call handling when no ToolRunner is configured."""
@@ -714,6 +752,20 @@ class LocalConnectionStrategyConfigTest(unittest.TestCase):
     self.assertFalse(config.HasField("system_instructions"))
     self.assertEqual(len(config.workspaces), 0)
     self.assertEqual(len(config.skills_paths), 0)
+
+  def test_capabilities_config_finish_tool_schema_json_to_proto(self):
+    """Verifies capabilities config propagates finish tool schema to the proto config.
+
+    Why: The user's custom schema must be delivered to the Go harness so it can
+    be appropriately injected into the finish tool declaration.
+    """
+    strategy = self._make_strategy(
+        capabilities_config=types.CapabilitiesConfig(
+            finish_tool_schema_json='{"type": "object"}',
+        )
+    )
+    config = strategy._build_harness_config()
+    self.assertEqual(config.finish_tool_schema_json, '{"type": "object"}')
 
   def test_gemini_config_to_proto(self):
     """Verifies GeminiConfig fields translate to the correct proto fields.

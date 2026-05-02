@@ -99,6 +99,7 @@ _BUILTIN_TOOL_PROTO_FIELDS: dict[types.BuiltinTools, str] = {
     types.BuiltinTools.VIEW_FILE: "view_file",
     types.BuiltinTools.START_SUBAGENT: "invoke_subagent",
     types.BuiltinTools.GENERATE_IMAGE: "generate_image",
+    types.BuiltinTools.FINISH: "finish",
 }
 
 # Fallback action name used when a tool confirmation request does not match any
@@ -137,6 +138,8 @@ class LocalConnectionStep(types.Step):
     step_type = types.StepType.UNKNOWN
     if step_dict.get("compaction") is not None:
       step_type = types.StepType.COMPACTION
+    elif step_dict.get("finish") is not None:
+      step_type = types.StepType.FINISH
     elif tc_dict or any(
         step_dict.get(k) is not None
         for k in _BUILTIN_TOOL_PROTO_FIELDS.values()
@@ -156,6 +159,18 @@ class LocalConnectionStep(types.Step):
     has_text = bool(step_dict.get("text"))
     is_final_response = is_from_model and is_done and has_text
 
+    structured_output = None
+    if step_type == types.StepType.FINISH:
+      finish_dict = step_dict.get("finish", {})
+      output_string = finish_dict.get("output_string")
+      if output_string:
+        try:
+          structured_output = json.loads(output_string)
+        except json.JSONDecodeError:
+          logging.warning(
+              "Failed to parse structured output JSON.", exc_info=True
+          )
+
     return cls(
         id=id_str,
         step_index=step_idx,
@@ -170,6 +185,7 @@ class LocalConnectionStep(types.Step):
         error=step_dict.get("error_message", ""),
         is_final_response=is_final_response,
         target=step_dict.get("target", ""),
+        structured_output=structured_output,
     )
 
 
@@ -1012,6 +1028,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
         harness_side_tools=harness_side_tools,
         # 0 tells the harness to use its default (30000 tokens).
         compaction_threshold=cfg.compaction_threshold or 0,
+        finish_tool_schema_json=cfg.finish_tool_schema_json or "",
     )
 
     return harness_config

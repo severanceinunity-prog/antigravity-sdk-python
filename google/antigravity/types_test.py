@@ -180,6 +180,7 @@ class StepTest(unittest.TestCase):
     self.assertEqual(step.tool_calls, [])
     self.assertEqual(step.error, "")
     self.assertIsNone(step.is_final_response)
+    self.assertIsNone(step.structured_output)
 
   def test_mutable(self):
     """Verifies that Step is mutable as per Karmel's model."""
@@ -665,6 +666,7 @@ class CapabilitiesConfigTest(unittest.TestCase):
     self.assertIsNone(config.enabled_tools)
     self.assertIsNone(config.disabled_tools)
     self.assertIsNone(config.compaction_threshold)
+    self.assertIsNone(config.finish_tool_schema_json)
 
   def test_enabled_tools(self):
     """Verifies that enabled_tools accepts a list of BuiltinTools."""

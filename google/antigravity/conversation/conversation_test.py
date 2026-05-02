@@ -331,6 +331,27 @@ class ConversationChatTest(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(result.text, "")
     self.assertEqual(len(result.steps), 1)
 
+  async def test_chat_returns_structured_output_when_final_step_has_it(self):
+    """Verifies chat() collects and returns structured_output from the final step."""
+    final_step = _make_step(
+        "done", step_index=1, step_type=types.StepType.FINISH, is_final=True
+    )
+    final_step.structured_output = {"total_revenue": 386.0}
+
+    mock_connection = mock.MagicMock(spec=connection.Connection)
+    mock_connection.wait_for_idle = mock.AsyncMock()
+    mock_connection.send = mock.AsyncMock()
+
+    async def mock_generator():
+      yield final_step
+
+    mock_connection.receive_steps.return_value = mock_generator()
+    conv = conversation.Conversation(mock_connection)
+
+    result = await conv.chat("question")
+
+    self.assertEqual(result.structured_output, {"total_revenue": 386.0})
+
 
 class ConversationStateTest(unittest.IsolatedAsyncioTestCase):
   """Validates state introspection properties."""

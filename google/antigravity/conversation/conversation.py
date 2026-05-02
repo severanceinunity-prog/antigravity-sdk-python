@@ -127,11 +127,16 @@ class Conversation:
     await self.send(prompt)
     steps = []
     final_response = ""
+    structured_output = None
     async for step in self.receive_steps():
       steps.append(step)
       if step.is_final_response:
         final_response = step.content
-    return types.ChatResponse(text=final_response, steps=steps)
+      if step.type == types.StepType.FINISH:
+        structured_output = step.structured_output
+    return types.ChatResponse(
+        text=final_response, steps=steps, structured_output=structured_output
+    )
 
   # ---------------------------------------------------------------------------
   # History and state

@@ -178,6 +178,8 @@ class BuiltinTools(str, enum.Enum):
     RUN_COMMAND: Execute a shell command.
     ASK_QUESTION: Ask the user a clarifying question.
     START_SUBAGENT: Invoke a subagent.
+    GENERATE_IMAGE: Generate or edit images.
+    FINISH: Finish the conversation and return structured output.
   """
 
   LIST_DIR = "list_directory"
@@ -190,11 +192,18 @@ class BuiltinTools(str, enum.Enum):
   ASK_QUESTION = "ask_question"
   START_SUBAGENT = "start_subagent"
   GENERATE_IMAGE = "generate_image"
+  FINISH = "finish"
 
   @classmethod
   def read_only(cls) -> list["BuiltinTools"]:
     """Returns tools that only read state (no writes, deletes, or commands)."""
-    return [cls.LIST_DIR, cls.SEARCH_DIR, cls.FIND_FILE, cls.VIEW_FILE]
+    return [
+        cls.LIST_DIR,
+        cls.SEARCH_DIR,
+        cls.FIND_FILE,
+        cls.VIEW_FILE,
+        cls.FINISH,
+    ]
 
   @classmethod
   def nondestructive(cls) -> list["BuiltinTools"]:
@@ -209,6 +218,7 @@ class BuiltinTools(str, enum.Enum):
         cls.ASK_QUESTION,
         cls.START_SUBAGENT,
         cls.GENERATE_IMAGE,
+        cls.FINISH,
     ]
 
 
@@ -227,6 +237,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
       compacted. When None, the backend's default is used.
     image_model: The model to use for image generation. Defaults to
       'gemini-3.1-flash-image-preview'.
+    finish_tool_schema_json: Optional JSON schema string for the finish tool.
   """
 
   enable_subagents: bool = True
@@ -234,6 +245,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
   disabled_tools: list[BuiltinTools] | None = None
   compaction_threshold: int | None = None
   image_model: str = "gemini-3.1-flash-image-preview"
+  finish_tool_schema_json: str | None = None
 
   @pydantic.model_validator(mode="after")
   def _check_mutually_exclusive(self) -> "CapabilitiesConfig":
@@ -296,6 +308,7 @@ class StepType(str, enum.Enum):
   TOOL_CALL = "TOOL_CALL"
   SYSTEM_MESSAGE = "SYSTEM_MESSAGE"
   COMPACTION = "COMPACTION"
+  FINISH = "FINISH"
   UNKNOWN = "UNKNOWN"
 
 
@@ -333,6 +346,7 @@ class Step(pydantic.BaseModel):
     tool_calls: List of tool calls associated with the step.
     error: Short error message if the step failed or empty string.
     is_final_response: True if this step is a complete model response.
+    structured_output: The structured output extracted from the finish step.
   """
 
   id: str = ""
@@ -345,6 +359,7 @@ class Step(pydantic.BaseModel):
   tool_calls: list[ToolCall] = pydantic.Field(default_factory=list)
   error: str = ""
   is_final_response: bool | None = None
+  structured_output: Any | None = None
 
   model_config = pydantic.ConfigDict(extra="allow")
 
@@ -524,7 +539,9 @@ class ChatResponse(pydantic.BaseModel):
   Attributes:
     text: The final model response text.
     steps: All steps received during the interaction.
+    structured_output: The structured output extracted from the finish step.
   """
 
   text: str
   steps: list[Step]
+  structured_output: Any | None = None

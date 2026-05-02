@@ -784,6 +784,31 @@ class AgentConfigTest(unittest.TestCase):
     self.assertEqual(config.gemini_config.models.default.name, "custom-model")
     self.assertEqual(config.gemini_config.api_key, "key-only")
 
+  @mock.patch.object(
+      agent.local_connection, "LocalConnectionStrategy", autospec=True
+  )
+  @mock.patch.object(conversation.Conversation, "create", autospec=True)
+  async def test_agent_with_response_schema(
+      self, mock_conv_create, mock_strategy_class
+  ):
+    del mock_conv_create  # Unused.
+
+    mock_strategy_instance = mock_strategy_class.return_value
+    mock_strategy_instance.stop = mock.AsyncMock()
+
+    schema_dict = {"properties": {"field": {"type": "string"}}}
+    config = agent.AgentConfig(
+        system_instructions="test", response_schema=schema_dict
+    )
+    async with agent.Agent(config) as _:
+      _, kwargs = mock_strategy_class.call_args
+      capabilities_config = kwargs.get("capabilities_config")
+      self.assertIsNotNone(capabilities_config)
+      self.assertEqual(
+          capabilities_config.finish_tool_schema_json,
+          '{"properties": {"field": {"type": "string"}}}',
+      )
+
 
 if __name__ == "__main__":
   unittest.main()
