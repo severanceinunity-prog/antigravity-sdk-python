@@ -80,12 +80,23 @@ permission.
 
 ### Permissions
 
-You typically need to allow the agent to call MCP tools by adding appropriate
-grants. For example, to allow all tools from a specific MCP server:
+By default, the SDK's default policy (`confirm_run_command()`) is permissive and
+**allows all MCP tools** (it only blocks or asks for confirmation on
+`run_command`).
+
+However, if you configure a strict **deny-by-default** setup (using
+`policy.deny_all()`), you must explicitly allow your MCP tools by their exact
+registered names.
+
+For example, to allow a specific tool named `my_mcp_tool` exposed by your MCP
+server in a deny-by-default setup:
 
 ```python
 # In your safety policy configuration
-policy.allow("mcp(my_mcp_server/*)")
+policies = [
+    policy.deny_all(),
+    policy.allow("my_mcp_tool"),  # Must use the exact tool name
+]
 ```
 
 See [Safety Policies](safety_policies.md) for more details on how to configure
