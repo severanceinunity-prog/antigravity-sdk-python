@@ -146,9 +146,6 @@ if [[ -z "${PUBLISH_PREBUILT_VERSION:-}" ]]; then
     if [[ ! -f "${LOCAL_BIN}" ]]; then
       MPM_SUBDIR="${MPM_DIRS[$PLATFORM]:-}"
       MPM_BIN="${MPM_DIR}/${MPM_SUBDIR}/localharness_external"
-      if [[ "${PLATFORM}" == windows-* ]]; then
-        MPM_BIN="${MPM_BIN}.exe"
-      fi
       if [[ -n "${MPM_SUBDIR}" && -f "${MPM_BIN}" ]]; then
         echo "--- Copying ${PLATFORM} binary from MPM ---"
         mkdir -p "${BINARIES_DIR}/${PLATFORM}"
