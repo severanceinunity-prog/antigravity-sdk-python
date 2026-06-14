@@ -166,7 +166,7 @@ class Agent:
       # Wire ToolContext into ToolRunner so tools can access
       # conversation capabilities (same pattern as TriggerRunner).
       if self._tool_runner:
-        ctx = tool_context.ToolContext(self.conversation.connection)
+        ctx = tool_context.ToolContext(self.conversation)
         self._tool_runner.set_context(ctx)
 
       return self
